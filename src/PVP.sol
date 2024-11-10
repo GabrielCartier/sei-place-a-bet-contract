@@ -52,11 +52,6 @@ contract PVP {
         // Ensure the caller is the VRFConsumer contract
         if (msg.sender != address(VRF_CONSUMER)) revert InvalidVRFConsumer();
 
-        // // Retrieve the randomness request details from the VRFConsumer contract
-        RandomnessRequest memory request = VRF_CONSUMER.getRequestById(requestId);
-
-        if (!_verifyProof(request.userProvidedSeed, requestId, randomNumber, proof)) revert InvalidProof();
-
         MatchedBet memory bet = matchedBets[requestId];
         address player1 = bet.player1;
         address player2 = bet.player2;
@@ -127,47 +122,5 @@ contract PVP {
         }
 
         return wholeTokens == 1;
-    }
-
-    function _verifyProof(bytes32 userProvidedSeed, uint256 requestId, bytes32 randomNumber, bytes memory proof)
-        internal
-        view
-        returns (bool)
-    {
-        // Reconstruct the message that was signed to generate the proof
-        bytes32 message = keccak256(abi.encodePacked(userProvidedSeed, requestId));
-
-        // Hash the message according to the Ethereum signed message format
-        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
-
-        // Recover the signer address from the proof (signature)
-        address recoveredSigner = _recoverSigner(ethSignedMessageHash, proof);
-
-        // Retrieve the VRF public key from the VRFConsumer contract
-        address vrfPublicKey = VRF_CONSUMER.getVRFPublicKey();
-
-        // Verify that the recovered signer matches the VRF public key
-        if (recoveredSigner != vrfPublicKey) {
-            return false;
-        }
-
-        // Verify that the provided random number matches the hash of the signature
-        return randomNumber == keccak256(proof);
-    }
-
-    function _recoverSigner(bytes32 ethSignedMessageHash, bytes memory signature) internal pure returns (address) {
-        if (signature.length != 65) revert InvalidSignature();
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            // Extract the r, s, and v components from the signature
-            r := mload(add(signature, 32))
-            s := mload(add(signature, 64))
-            v := byte(0, mload(add(signature, 96)))
-        }
-        // Recover and return the signer address
-        return ecrecover(ethSignedMessageHash, v, r, s);
     }
 }
