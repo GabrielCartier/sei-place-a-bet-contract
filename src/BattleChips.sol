@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "@lib/seipex/IVRFConsumer.sol";
 import {ERC20} from "@openzeppelin-contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
 
 struct MatchedBet {
     address player1;
@@ -16,7 +17,7 @@ struct MatchedBet {
  * @author Based on the original HeadToHead Contract by @0xQuit (https://apescan.io/address/0x88c1f4ecde714fba062853da1f686171f560ebaa)
  * @author @0xGabey
  */
-contract BattleChips {
+contract BattleChips is Ownable {
     error InvalidAmount();
     error NoMatchAvailable();
     error TransferFailed();
@@ -42,16 +43,22 @@ contract BattleChips {
     uint8 private immutable CHIPS_DECIMALS;
     uint256 private immutable BASE_UNIT;
 
+    // Add tax rate constant (2.5% = 250 basis points)
+    uint256 private constant TAX_RATE = 250; // 2.50%
+    uint256 private constant BASIS_POINTS = 10000; // 100%
+
+    // Add accumulated fees tracking
+    uint256 public accumulatedFees;
+
     // Add constructor to set the immutable values
     constructor() {
         CHIPS_DECIMALS = CHIPS.decimals();
         BASE_UNIT = 10 ** CHIPS_DECIMALS;
+        _initializeOwner(msg.sender); // Initialize the owner
     }
 
     /// @notice Place a bet of a specific amount and wait for an opponent
     function placeBet(uint256 amount) external {
-        // Validate bet amount is a power of 10 based on CHIPS decimals
-        if (amount == 0 || !_isPowerOfTen(amount)) revert InvalidAmount();
         if (!CHIPS.transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
         address opponent = pendingBets[amount];
 
@@ -84,14 +91,24 @@ contract BattleChips {
         MatchedBet memory bet = matchedBets[requestId];
         address player1 = bet.player1;
         address player2 = bet.player2;
-        uint256 betAmount = uint256(bet.amount);
+        uint256 betAmount = bet.amount;
         if (player1 == address(0)) revert InvalidRequestId();
+
         // Determine winner
         address winner = uint256(randomNumber) % 2 == 0 ? player1 : player2;
         address loser = winner == player1 ? player2 : player1;
 
-        // transfer to winner
-        if (!CHIPS.transfer(winner, betAmount * 2)) revert TransferFailed();
+        // Calculate prize and tax
+        uint256 totalPrize = betAmount * 2;
+        uint256 tax = (totalPrize * TAX_RATE) / BASIS_POINTS;
+        uint256 winnerPrize = totalPrize - tax;
+
+        // Update accumulated fees
+        accumulatedFees += tax;
+
+        // Transfer prize to winner
+        if (!CHIPS.transfer(winner, winnerPrize)) revert TransferFailed();
+
         emit BetResolved(winner, loser, betAmount);
     }
 
@@ -118,6 +135,13 @@ contract BattleChips {
         emit BetCancelled(player2, amount);
     }
 
+    /// @notice Withdraw accumulated fees (only owner)
+    function withdrawFees() external onlyOwner {
+        uint256 amount = accumulatedFees;
+        accumulatedFees = 0;
+        if (!CHIPS.transfer(owner(), amount)) revert TransferFailed();
+    }
+
     // Internal functions
 
     /// @dev Initiates a game between two matched players
@@ -129,23 +153,5 @@ contract BattleChips {
 
         matchedBets[requestId] = MatchedBet(msg.sender, opponent, amount);
         emit BetMatched(msg.sender, opponent, amount);
-    }
-
-    /// @dev Helper function to check if amount is a power of 10 based on CHIPS decimals
-    function _isPowerOfTen(uint256 amount) internal view returns (bool) {
-        if (amount % BASE_UNIT != 0) return false;
-        // Convert to whole token units for power of 10 check
-        uint256 wholeTokens = amount / BASE_UNIT;
-
-        // Add safety check for maximum reasonable bet
-        if (wholeTokens > 1e9) return false; // Max 1 billion
-
-        // If not 1, keep dividing by 10 and check remainder
-        while (wholeTokens > 1) {
-            if (wholeTokens % 10 != 0) return false;
-            wholeTokens = wholeTokens / 10;
-        }
-
-        return wholeTokens == 1;
     }
 }
