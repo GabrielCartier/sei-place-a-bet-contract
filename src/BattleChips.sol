@@ -11,34 +11,34 @@ struct MatchedBet {
 }
 
 /**
- * @title Place a Bet
+ * @title BattleChips
  * @dev A decentralized betting game where players can place bets (order of 10) to play against each other
  * @author Based on the original HeadToHead Contract by @0xQuit (https://apescan.io/address/0x88c1f4ecde714fba062853da1f686171f560ebaa)
  * @author @0xGabey
  */
-contract PVP {
+contract BattleChips {
     error InvalidAmount();
     error NoMatchAvailable();
     error TransferFailed();
-
+    error RequestNotExpired();
     // VRF Errors
     error InvalidVRFConsumer();
     error InvalidSignature();
     error InvalidProof();
     error InvalidRequestId();
 
-    IVRFConsumer public constant VRF_CONSUMER = IVRFConsumer(0x7efDa6beA0e3cE66996FA3D82953FF232650ea67);
-
-    // Maps bet amounts to pending players waiting for matches
-    mapping(uint256 => address) public pendingBets;
-    mapping(uint256 => MatchedBet) public matchedBets;
-
+    // Events
     event BetPlaced(address indexed player, uint256 amount);
     event BetMatched(address indexed player1, address indexed player2, uint256 amount);
     event BetResolved(address indexed winner, address indexed loser, uint256 amount);
     event BetCancelled(address indexed player, uint256 amount);
 
-    ERC20 public constant CHIPS = ERC20(0xBd82f3bfE1dF0c84faEC88a22EbC34C9A86595dc);
+    // Maps bet amounts to pending players waiting for matches
+    mapping(uint256 => address) public pendingBets;
+    mapping(uint256 => MatchedBet) public matchedBets;
+
+    IVRFConsumer private constant VRF_CONSUMER = IVRFConsumer(0x7efDa6beA0e3cE66996FA3D82953FF232650ea67);
+    ERC20 private constant CHIPS = ERC20(0xBd82f3bfE1dF0c84faEC88a22EbC34C9A86595dc);
     uint8 private immutable CHIPS_DECIMALS;
     uint256 private immutable BASE_UNIT;
 
@@ -48,7 +48,36 @@ contract PVP {
         BASE_UNIT = 10 ** CHIPS_DECIMALS;
     }
 
-    function randomnessCallback(bytes32 randomNumber, uint256 requestId, bytes memory proof) external {
+    /// @notice Place a bet of a specific amount and wait for an opponent
+    function placeBet(uint256 amount) external {
+        // Validate bet amount is a power of 10 based on CHIPS decimals
+        if (amount == 0 || !_isPowerOfTen(amount)) revert InvalidAmount();
+        if (!CHIPS.transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        address opponent = pendingBets[amount];
+
+        if (opponent == address(0)) {
+            // No match available, store as pending
+            pendingBets[amount] = msg.sender;
+            emit BetPlaced(msg.sender, amount);
+        } else {
+            // Match found! Remove pending bet and play
+            pendingBets[amount] = address(0);
+            _playGame(opponent, amount);
+        }
+    }
+
+    /// @notice Cancel a pending bet and receive a refund
+    function cancelBet(uint256 amount) external {
+        if (pendingBets[amount] != msg.sender) revert NoMatchAvailable();
+
+        pendingBets[amount] = address(0);
+        if (!CHIPS.transfer(msg.sender, amount)) revert TransferFailed();
+
+        emit BetCancelled(msg.sender, amount);
+    }
+
+    /// @notice Callback function for VRF to resolve the bet
+    function randomnessCallback(bytes32 randomNumber, uint256 requestId, bytes memory /* proof */ ) external {
         // Ensure the caller is the VRFConsumer contract
         if (msg.sender != address(VRF_CONSUMER)) revert InvalidVRFConsumer();
 
@@ -66,26 +95,32 @@ contract PVP {
         emit BetResolved(winner, loser, betAmount);
     }
 
-    function placeBet(uint256 amount) external {
-        // Validate bet amount is a power of 10 based on CHIPS decimals
-        if (amount == 0 || !_isPowerOfTen(amount)) revert InvalidAmount();
+    /// @notice Allows anyone to resolve an expired bet and return funds to players
+    function redeemExpiredBet(uint256 requestId) external {
+        MatchedBet memory bet = matchedBets[requestId];
+        if (bet.player1 == address(0) || bet.player2 == address(0)) revert InvalidRequestId();
 
-        // Place bet
-        if (!CHIPS.transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        // Get the request and check if it's expired (status == 2)
+        RandomnessRequest memory request = VRF_CONSUMER.getRequestById(requestId);
+        if (request.status != 2) revert RequestNotExpired();
 
-        address opponent = pendingBets[amount];
+        address player1 = bet.player1;
+        address player2 = bet.player2;
+        uint256 amount = bet.amount;
+        delete matchedBets[requestId];
 
-        if (opponent == address(0)) {
-            // No match available, store as pending
-            pendingBets[amount] = msg.sender;
-            emit BetPlaced(msg.sender, amount);
-        } else {
-            // Match found! Remove pending bet and play
-            pendingBets[amount] = address(0);
-            _playGame(opponent, amount);
-        }
+        // Return funds to both players
+        if (!CHIPS.transfer(player1, amount)) revert TransferFailed();
+        if (!CHIPS.transfer(player2, amount)) revert TransferFailed();
+
+        // Emit event for the cancelled bet
+        emit BetCancelled(player1, amount);
+        emit BetCancelled(player2, amount);
     }
 
+    // Internal functions
+
+    /// @dev Initiates a game between two matched players
     function _playGame(address opponent, uint256 amount) internal {
         bytes32 pseudoRandomNumber = keccak256(abi.encodePacked(block.timestamp, block.number, msg.sender));
 
@@ -96,17 +131,7 @@ contract PVP {
         emit BetMatched(msg.sender, opponent, amount);
     }
 
-    function cancelBet(uint256 amount) external {
-        if (pendingBets[amount] != msg.sender) revert NoMatchAvailable();
-
-        pendingBets[amount] = address(0);
-        // Transfer back the funds
-        if (!CHIPS.transfer(msg.sender, amount)) revert TransferFailed();
-
-        emit BetCancelled(msg.sender, amount);
-    }
-
-    // Helper function to check if amount is a power of 10 based on CHIPS decimals
+    /// @dev Helper function to check if amount is a power of 10 based on CHIPS decimals
     function _isPowerOfTen(uint256 amount) internal view returns (bool) {
         if (amount % BASE_UNIT != 0) return false;
         // Convert to whole token units for power of 10 check
