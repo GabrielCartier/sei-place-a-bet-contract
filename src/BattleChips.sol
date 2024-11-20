@@ -11,6 +11,7 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable {
     uint256 private constant TAX_RATE = 420; // 4.20%
     uint256 private constant BASIS_POINTS = 10000; // 100%
 
+    address private constant MULTISIG = 0xBDc6dDF7D37F8FeC261DEdC44A470B42CB9ffDb0;
     IVRFConsumer private constant VRF_CONSUMER = IVRFConsumer(0x7efDa6beA0e3cE66996FA3D82953FF232650ea67);
 
     constructor() {
@@ -57,6 +58,7 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable {
 
         MatchedBet memory bet = matchedBets[requestId];
         if (bet.player1 == address(0)) revert InvalidRequestId();
+        delete matchedBets[requestId];
 
         address winner = uint256(randomNumber) % 2 == 0 ? bet.player1 : bet.player2;
         address loser = winner == bet.player1 ? bet.player2 : bet.player1;
@@ -97,13 +99,13 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable {
         emit BetMatched(token, msg.sender, opponent, amount);
     }
 
-    function withdrawFees(address token) external onlyOwner {
+    function withdrawFees(address token) external {
         uint256 amount = accumulatedFees[token];
         if (amount == 0) revert NoFeesToWithdraw();
 
         accumulatedFees[token] = 0;
 
-        if (!ERC20(token).transfer(owner(), amount)) revert TransferFailed();
+        if (!ERC20(token).transfer(MULTISIG, amount)) revert TransferFailed();
 
         emit FeesWithdrawn(token, amount);
     }
