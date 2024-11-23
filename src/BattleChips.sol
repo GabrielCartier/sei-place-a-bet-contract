@@ -8,7 +8,7 @@ import {IBattleChips} from "@battlechips/interfaces/IBattleChips.sol";
 import {BattleChipsStorage} from "@battlechips/BattleChipsStorage.sol";
 
 contract BattleChips is IBattleChips, BattleChipsStorage, Ownable {
-    uint256 private constant TAX_RATE = 420; // 4.20%
+    uint256 private constant TAX_RATE = 250; // 2.5%
     uint256 private constant BASIS_POINTS = 10000; // 100%
 
     address private constant MULTISIG = 0xBDc6dDF7D37F8FeC261DEdC44A470B42CB9ffDb0;
