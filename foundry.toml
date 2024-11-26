@@ -7,7 +7,12 @@ src = "src"
 out = "out"
 libs = ["lib", "dependencies"]
 
-remappings = ["@battlechips/=src", "@lib/=lib", "@test/=test"]
+remappings = [
+    "@battlechips/=src",
+    "@lib/=lib",
+    "@test/=test",
+    "@pythnetwork/=node_modules/@pythnetwork/entropy-sdk-solidity",
+]
 
 fuzz_runs = 1000
 

@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@pythnetwork/entropy-sdk-solidity':
+        specifier: ^1.5.0
+        version: 1.5.0
     devDependencies:
       husky:
         specifier: 9.1.6
@@ -60,6 +64,9 @@ packages:
     resolution: {integrity: sha512-3dcmCyAxIcxy036h1I7MQU/uEEBq8oLwf1CE3xeze+MPlgkdlb/+w6rGR/1dhp6Hqi17fRS6nvwnOzkESxEkOw==}
     peerDependencies:
       prettier: ^3.0.0
+
+  '@pythnetwork/entropy-sdk-solidity@1.5.0':
+    resolution: {integrity: sha512-ZZti5BLURe4w0HtCwy2qGJayOtAcWjjfpnUsar6fHZPG2SkC3jfj13m9WBJKLk87T1ZaSpazAdb22pm6MXG8qg==}
 
   '@sindresorhus/is@5.6.0':
     resolution: {integrity: sha512-TV7t8GKYaJWsn00tFDqBw8+Uqmr8A0fRU1tvTQhyZzGv0sJCGRQL3JGMI3ucuKo3XIZdUP+Lx7/gh2t3lewy7g==}
@@ -720,6 +727,8 @@ snapshots:
   '@prettier/sync@0.3.0(prettier@3.3.3)':
     dependencies:
       prettier: 3.3.3
+
+  '@pythnetwork/entropy-sdk-solidity@1.5.0': {}
 
   '@sindresorhus/is@5.6.0': {}
 

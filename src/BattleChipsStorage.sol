@@ -18,7 +18,7 @@ contract BattleChipsStorage {
     mapping(address => mapping(uint256 => address)) public pendingBets;
 
     // Maps requestId => matched bet details
-    mapping(uint256 => MatchedBet) public matchedBets;
+    mapping(uint64 => MatchedBet) public matchedBets;
 
     // Allowed tokens
     mapping(address => bool) public allowedTokens;

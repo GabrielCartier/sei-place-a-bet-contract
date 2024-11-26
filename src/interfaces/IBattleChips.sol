@@ -8,11 +8,11 @@ interface IBattleChips {
     error TransferFailed();
     error RequestNotExpired();
     error TokenNotAllowed();
-    error InvalidVRFConsumer();
-    error InvalidRequestId();
+    error InvalidSequenceNumber();
     error NoFeesToWithdraw();
-
+    error InsufficientFunds();
     // Events
+
     event TokenAdded(address indexed token);
     event TokenRemoved(address indexed token);
     event BetPlaced(address indexed token, address indexed player, uint256 amount);
@@ -24,8 +24,7 @@ interface IBattleChips {
     // Functions
     function addToken(address token) external;
     function removeToken(address token) external;
-    function placeBet(address token, uint256 amount) external;
+    function placeBet(address token, uint256 amount) external payable;
     function cancelBet(address token, uint256 amount) external;
-    function redeemExpiredBet(address token, uint256 requestId) external;
     function withdrawFees(address token) external;
 }
