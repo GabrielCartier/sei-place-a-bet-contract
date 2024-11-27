@@ -16,8 +16,17 @@ interface IBattleChips {
     event TokenAdded(address indexed token);
     event TokenRemoved(address indexed token);
     event BetPlaced(address indexed token, address indexed player, uint256 amount);
-    event BetMatched(address indexed token, address indexed player1, address indexed player2, uint256 amount);
-    event BetResolved(address indexed token, address indexed winner, address indexed loser, uint256 amount);
+    event BetMatched(
+        address indexed token,
+        address indexed player1,
+        address indexed player2,
+        uint256 amount,
+        uint64 sequenceNumber,
+        bytes32 randomNumber
+    );
+    event BetResolved(
+        address indexed token, address indexed winner, address indexed loser, uint256 amount, uint64 sequenceNumber
+    );
     event BetCancelled(address indexed token, address indexed player, uint256 amount);
     event FeesWithdrawn(address indexed token, uint256 amount);
 

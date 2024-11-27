@@ -21,7 +21,6 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable, IEntropyConsu
     }
 
     // @dev For IEntropyConsumer
-    // solhint-disable-next-line
     function getEntropy() internal view override returns (address) {
         return address(ENTROPY);
     }
@@ -78,7 +77,7 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable, IEntropyConsu
         accumulatedFees[bet.token] += tax;
         if (!ERC20(bet.token).transfer(winner, winnerPrize)) revert TransferFailed();
 
-        emit BetResolved(bet.token, winner, loser, bet.amount);
+        emit BetResolved(bet.token, winner, loser, bet.amount, sequenceNumber);
     }
 
     function _playGame(address token, address opponent, uint256 amount) internal {
@@ -91,7 +90,7 @@ contract BattleChips is IBattleChips, BattleChipsStorage, Ownable, IEntropyConsu
         uint64 sequenceNumber = ENTROPY.requestWithCallback{value: requestFee}(PROVIDER, pseudoRandomNumber);
 
         matchedBets[sequenceNumber] = MatchedBet(token, msg.sender, opponent, amount);
-        emit BetMatched(token, msg.sender, opponent, amount);
+        emit BetMatched(token, msg.sender, opponent, amount, sequenceNumber, pseudoRandomNumber);
     }
 
     function withdrawFees(address token) external {
